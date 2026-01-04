@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "diary",
+    "name": "Diary",
     "slug": "diary",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -13,13 +13,14 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#1f2937",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.hidesorganization.diary"
     },
     "web": {
       "output": "static",
@@ -43,6 +44,13 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "f9118bc8-2c5d-4716-9357-b91416eb1da4"
+      }
+    },
+    "owner": "hides-organization"
   }
 }
