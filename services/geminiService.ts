@@ -1,18 +1,19 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import * as FileSystem from "expo-file-system/legacy";
-
-// NOTE: Ideally this comes from process.env.EXPO_PUBLIC_GEMINI_API_KEY
-// For now, we'll let the user provide it or rely on env vars.
-const API_KEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY || "";
-
-const genAI = new GoogleGenerativeAI(API_KEY);
+import { getGeminiApiKey, getSettings, getTonePrompt } from "./settingsService";
 
 export const generateDiaryEntry = async (audioUri: string): Promise<string> => {
-  if (!API_KEY) {
+  // Get API key from user settings or fallback to env
+  const apiKey = await getGeminiApiKey();
+
+  if (!apiKey) {
     throw new Error(
-      "Gemini API Key is missing. Please set EXPO_PUBLIC_GEMINI_API_KEY."
+      "Gemini API Keyが設定されていません。設定画面でAPIキーを入力してください。"
     );
   }
+
+  const settings = await getSettings();
+  const tonePrompt = getTonePrompt(settings.diaryTone);
 
   try {
     // 1. Read audio file as Base64
@@ -20,22 +21,18 @@ export const generateDiaryEntry = async (audioUri: string): Promise<string> => {
       encoding: "base64",
     });
 
-    // 2. Prepare the model
-    const model = genAI.getGenerativeModel({ model: "gemini-3-flash-preview" });
+    // 2. Initialize Gemini with user's API key
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
-    // 3. Prompt for the diary
+    // 3. Prompt for the diary with user-selected tone
     const prompt = `
       Listen to this audio recording.
-      The speaker is a 38-year-old professional man talking about his day.
+      The speaker is talking about their day.
       Please write a diary entry based on this in Japanese.
 
       Style Guidelines:
-      - Write in a mature, reflective tone suitable for an adult man
-      - Use polite but natural Japanese (です/ます調 or 常体, whichever fits the content)
-      - Include thoughtful observations and personal reflections
-      - Avoid overly casual expressions, emoji, or cute language
-      - Keep it sincere and genuine, like a personal journal
-      - The tone should be calm, composed, and introspective
+      ${tonePrompt}
 
       CRITICAL OUTPUT FORMAT:
       You MUST return ONLY a valid JSON object. Do not include markdown formatting.
@@ -51,7 +48,7 @@ export const generateDiaryEntry = async (audioUri: string): Promise<string> => {
       prompt,
       {
         inlineData: {
-          mimeType: "audio/mp4", // expo-av default usually m4a/mp4, adjust if needed
+          mimeType: "audio/mp4",
           data: base64Audio,
         },
       },
