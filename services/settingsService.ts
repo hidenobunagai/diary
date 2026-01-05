@@ -42,8 +42,8 @@ export const saveSettings = async (
 
 export const getGeminiApiKey = async (): Promise<string> => {
   const settings = await getSettings();
-  // Fallback to env variable if not set by user
-  return settings.geminiApiKey || process.env.EXPO_PUBLIC_GEMINI_API_KEY || "";
+  // User must provide their own API key - no fallback for Play Store release
+  return settings.geminiApiKey;
 };
 
 export const getTonePrompt = (tone: DiarySettings["diaryTone"]): string => {

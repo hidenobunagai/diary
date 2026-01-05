@@ -86,9 +86,7 @@ export default function VoiceRecorder() {
 
   return (
     <View className="w-full items-center bg-gray-900 p-6 min-h-full">
-      <Text className="text-3xl font-bold mb-2 text-white mt-8">
-        Voice Diary
-      </Text>
+      <Text className="text-3xl font-bold mb-2 text-white mt-8">dIAry</Text>
       <Text className="text-sm text-gray-400 mb-10">
         今日の出来事を声で記録
       </Text>

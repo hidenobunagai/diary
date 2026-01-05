@@ -100,8 +100,8 @@ export default function SettingsScreen() {
             autoCapitalize="none"
             autoCorrect={false}
           />
-          <Text className="text-gray-500 text-xs mt-2">
-            ※ 設定しない場合はデフォルトのキーが使用されます
+          <Text className="text-red-400 text-xs mt-2">
+            ※ APIキーは必須です。録音機能を使用するには設定してください
           </Text>
         </View>
 
