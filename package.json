@@ -19,6 +19,7 @@
     "@react-navigation/native": "^7.1.8",
     "@types/lodash": "^4.17.21",
     "expo": "~54.0.30",
+    "expo-ads-admob": "^13.0.0",
     "expo-av": "~16.0.8",
     "expo-constants": "~18.0.12",
     "expo-file-system": "~19.0.21",

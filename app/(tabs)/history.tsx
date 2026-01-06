@@ -1,3 +1,4 @@
+import BannerAd from "@/components/BannerAd";
 import {
   DiaryEntry,
   deleteDiaryEntry,
@@ -252,6 +253,9 @@ export default function HistoryScreen() {
           }
         />
       )}
+
+      {/* Banner Ad */}
+      <BannerAd />
 
       {/* Detail/Edit Modal */}
       <Modal
