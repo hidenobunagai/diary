@@ -4,13 +4,13 @@ const SETTINGS_KEY = "@diary_settings";
 
 export interface DiarySettings {
   geminiApiKey: string;
-  diaryTone: "formal" | "casual" | "reflective" | "poetic";
+  diaryTone: "simple" | "formal" | "casual" | "reflective" | "poetic";
   language: "ja" | "en";
 }
 
 const DEFAULT_SETTINGS: DiarySettings = {
   geminiApiKey: "",
-  diaryTone: "reflective",
+  diaryTone: "simple",
   language: "ja",
 };
 
@@ -48,6 +48,13 @@ export const getGeminiApiKey = async (): Promise<string> => {
 
 export const getTonePrompt = (tone: DiarySettings["diaryTone"]): string => {
   const tonePrompts = {
+    simple: `
+      - Summarize what was said in a straightforward, factual manner
+      - Use plain, natural Japanese without literary embellishment
+      - Focus on the actual events and facts mentioned
+      - Keep it simple and easy to understand
+      - Do not add poetic expressions or metaphors
+      - Write as if taking notes of what happened`,
     formal: `
       - Write in formal, polished Japanese (です・ます調)
       - Use professional language suitable for a business journal

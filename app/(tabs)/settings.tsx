@@ -21,6 +21,11 @@ const TONE_OPTIONS: {
   description: string;
 }[] = [
   {
+    value: "simple",
+    label: "シンプル",
+    description: "話した内容をそのままわかりやすくまとめる",
+  },
+  {
     value: "formal",
     label: "フォーマル",
     description: "丁寧でビジネス向けの文体",
@@ -41,7 +46,7 @@ const TONE_OPTIONS: {
 export default function SettingsScreen() {
   const [settings, setSettings] = useState<DiarySettings>({
     geminiApiKey: "",
-    diaryTone: "reflective",
+    diaryTone: "simple",
     language: "ja",
   });
   const [isSaving, setIsSaving] = useState(false);
