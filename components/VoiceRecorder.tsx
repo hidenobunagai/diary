@@ -15,7 +15,10 @@ export default function VoiceRecorder() {
     undefined
   );
   const [isProcessing, setIsProcessing] = useState(false);
-  const [diaryEntry, setDiaryEntry] = useState<string | null>(null);
+  const [diaryEntry, setDiaryEntry] = useState<{
+    title: string;
+    content: string;
+  } | null>(null);
 
   // Animation values
   const pulse = useSharedValue(1);
@@ -74,8 +77,8 @@ export default function VoiceRecorder() {
       const { saveDiaryEntry } = require("../services/storageService");
       await saveDiaryEntry(entryData.title, entryData.content);
 
-      setDiaryEntry(entryData.content);
-      Alert.alert("保存完了", "日記がクラウドに保存されました。");
+      setDiaryEntry({ title: entryData.title, content: entryData.content });
+      Alert.alert("保存完了", "日記を保存しました。");
     } catch (e) {
       console.error(e);
       Alert.alert("エラー", "日記の処理または保存に失敗しました。");
@@ -122,9 +125,11 @@ export default function VoiceRecorder() {
       {diaryEntry && (
         <View className="mt-10 p-5 bg-gray-800 rounded-xl w-full border border-gray-700">
           <Text className="text-lg font-bold mb-3 text-white">
-            📝 今日の日記
+            📝 {diaryEntry.title}
           </Text>
-          <Text className="text-gray-300 leading-relaxed">{diaryEntry}</Text>
+          <Text className="text-gray-300 leading-relaxed">
+            {diaryEntry.content}
+          </Text>
         </View>
       )}
     </View>
