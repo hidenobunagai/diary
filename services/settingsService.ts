@@ -4,7 +4,7 @@ const SETTINGS_KEY = "@diary_settings";
 
 export interface DiarySettings {
   geminiApiKey: string;
-  diaryTone: "simple" | "formal" | "casual" | "reflective" | "poetic";
+  diaryTone: "simple" | "casual" | "reflective";
   language: "ja" | "en";
 }
 
@@ -55,11 +55,6 @@ export const getTonePrompt = (tone: DiarySettings["diaryTone"]): string => {
       - Keep it simple and easy to understand
       - Do not add poetic expressions or metaphors
       - Write as if taking notes of what happened`,
-    formal: `
-      - Write in formal, polished Japanese (です・ます調)
-      - Use professional language suitable for a business journal
-      - Keep observations factual and structured
-      - Maintain a dignified, composed tone`,
     casual: `
       - Write in casual, relaxed Japanese (常体/タメ口)
       - Use natural everyday language
@@ -71,11 +66,6 @@ export const getTonePrompt = (tone: DiarySettings["diaryTone"]): string => {
       - Include thoughtful observations and personal reflections
       - Keep it sincere and genuine, like a personal journal
       - The tone should be calm, composed, and introspective`,
-    poetic: `
-      - Write in an expressive, literary style
-      - Use metaphors and descriptive language
-      - Include emotional depth and imagery
-      - Make it feel like a piece of creative writing`,
   };
   return tonePrompts[tone];
 };

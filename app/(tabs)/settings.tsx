@@ -26,11 +26,6 @@ const TONE_OPTIONS: {
     description: "話した内容をそのままわかりやすくまとめる",
   },
   {
-    value: "formal",
-    label: "フォーマル",
-    description: "丁寧でビジネス向けの文体",
-  },
-  {
     value: "casual",
     label: "カジュアル",
     description: "くだけた普段使いの文体",
@@ -40,7 +35,6 @@ const TONE_OPTIONS: {
     label: "内省的",
     description: "落ち着いた振り返りの文体",
   },
-  { value: "poetic", label: "詩的", description: "表現豊かで文学的な文体" },
 ];
 
 export default function SettingsScreen() {
