@@ -1,11 +1,21 @@
 import {
+  backupToGoogleDrive,
+  configureGoogleSignIn,
+  getCurrentUser,
+  isSignedIn,
+  restoreFromGoogleDrive,
+  signInWithGoogle,
+  signOutFromGoogle,
+} from "@/services/driveService";
+import {
   DiarySettings,
   getSettings,
   saveSettings,
 } from "@/services/settingsService";
 import { useFocusEffect } from "expo-router";
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   ScrollView,
   Text,
@@ -45,15 +55,40 @@ export default function SettingsScreen() {
   });
   const [isSaving, setIsSaving] = useState(false);
 
+  // Google Drive state
+  const [driveSignedIn, setDriveSignedIn] = useState(false);
+  const [driveEmail, setDriveEmail] = useState<string | null>(null);
+  const [lastBackup, setLastBackup] = useState<string | null>(null);
+  const [isBackingUp, setIsBackingUp] = useState(false);
+  const [isRestoring, setIsRestoring] = useState(false);
+
   const loadSettings = useCallback(async () => {
     const loaded = await getSettings();
     setSettings(loaded);
   }, []);
 
+  const loadDriveStatus = useCallback(async () => {
+    const signedIn = await isSignedIn();
+    setDriveSignedIn(signedIn);
+
+    if (signedIn) {
+      const user = await getCurrentUser();
+      if (user) {
+        setDriveEmail(user.email);
+        setLastBackup(user.lastBackup || null);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    configureGoogleSignIn();
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
       loadSettings();
-    }, [loadSettings])
+      loadDriveStatus();
+    }, [loadSettings, loadDriveStatus])
   );
 
   const handleSave = async () => {
@@ -70,6 +105,89 @@ export default function SettingsScreen() {
 
   const handleToneSelect = (tone: DiarySettings["diaryTone"]) => {
     setSettings((prev) => ({ ...prev, diaryTone: tone }));
+  };
+
+  const handleGoogleSignIn = async () => {
+    const result = await signInWithGoogle();
+    if (result.success) {
+      setDriveSignedIn(true);
+      setDriveEmail(result.email || null);
+      Alert.alert("ログイン成功", "Googleアカウントに接続しました");
+    } else {
+      Alert.alert("エラー", result.error || "ログインに失敗しました");
+    }
+  };
+
+  const handleGoogleSignOut = async () => {
+    Alert.alert("ログアウト確認", "Googleアカウントとの連携を解除しますか？", [
+      { text: "キャンセル", style: "cancel" },
+      {
+        text: "ログアウト",
+        style: "destructive",
+        onPress: async () => {
+          await signOutFromGoogle();
+          setDriveSignedIn(false);
+          setDriveEmail(null);
+          setLastBackup(null);
+        },
+      },
+    ]);
+  };
+
+  const handleBackup = async () => {
+    setIsBackingUp(true);
+    try {
+      const result = await backupToGoogleDrive();
+      if (result.success) {
+        setLastBackup(new Date().toISOString());
+        Alert.alert("バックアップ完了", "Google Driveにバックアップしました");
+      } else {
+        Alert.alert("エラー", result.error || "バックアップに失敗しました");
+      }
+    } finally {
+      setIsBackingUp(false);
+    }
+  };
+
+  const handleRestore = async () => {
+    Alert.alert(
+      "復元確認",
+      "現在のデータを上書きしてバックアップから復元しますか？\n※この操作は取り消せません",
+      [
+        { text: "キャンセル", style: "cancel" },
+        {
+          text: "復元",
+          style: "destructive",
+          onPress: async () => {
+            setIsRestoring(true);
+            try {
+              const result = await restoreFromGoogleDrive();
+              if (result.success) {
+                Alert.alert(
+                  "復元完了",
+                  "バックアップから復元しました。アプリを再起動してください。"
+                );
+              } else {
+                Alert.alert("エラー", result.error || "復元に失敗しました");
+              }
+            } finally {
+              setIsRestoring(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const formatDate = (dateStr: string) => {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString("ja-JP", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
   };
 
   return (
@@ -148,7 +266,7 @@ export default function SettingsScreen() {
 
         {/* Save Button */}
         <TouchableOpacity
-          className={`py-4 rounded-xl items-center ${
+          className={`py-4 rounded-xl items-center mb-8 ${
             isSaving ? "bg-gray-600" : "bg-blue-500"
           }`}
           onPress={handleSave}
@@ -158,6 +276,78 @@ export default function SettingsScreen() {
             {isSaving ? "保存中..." : "設定を保存"}
           </Text>
         </TouchableOpacity>
+
+        {/* Google Drive Backup Section */}
+        <View className="mb-6 border-t border-gray-700 pt-6">
+          <Text className="text-white font-bold text-lg mb-2">
+            ☁️ Google Drive バックアップ
+          </Text>
+          <Text className="text-gray-400 text-sm mb-4">
+            日記データをGoogle Driveにバックアップ・復元
+          </Text>
+
+          {driveSignedIn ? (
+            <View>
+              <View className="bg-gray-800 p-4 rounded-lg mb-4">
+                <Text className="text-gray-400 text-sm">ログイン中:</Text>
+                <Text className="text-white font-bold">{driveEmail}</Text>
+                {lastBackup && (
+                  <Text className="text-gray-500 text-xs mt-1">
+                    最終バックアップ: {formatDate(lastBackup)}
+                  </Text>
+                )}
+              </View>
+
+              <View className="flex-row gap-3 mb-3">
+                <TouchableOpacity
+                  className={`flex-1 py-3 rounded-xl items-center ${
+                    isBackingUp ? "bg-gray-600" : "bg-green-600"
+                  }`}
+                  onPress={handleBackup}
+                  disabled={isBackingUp || isRestoring}
+                >
+                  {isBackingUp ? (
+                    <ActivityIndicator color="white" />
+                  ) : (
+                    <Text className="text-white font-bold">
+                      📤 バックアップ
+                    </Text>
+                  )}
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  className={`flex-1 py-3 rounded-xl items-center ${
+                    isRestoring ? "bg-gray-600" : "bg-orange-600"
+                  }`}
+                  onPress={handleRestore}
+                  disabled={isBackingUp || isRestoring}
+                >
+                  {isRestoring ? (
+                    <ActivityIndicator color="white" />
+                  ) : (
+                    <Text className="text-white font-bold">📥 復元</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+
+              <TouchableOpacity
+                className="py-2 items-center"
+                onPress={handleGoogleSignOut}
+              >
+                <Text className="text-gray-400 underline">ログアウト</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <TouchableOpacity
+              className="py-4 rounded-xl items-center bg-white"
+              onPress={handleGoogleSignIn}
+            >
+              <Text className="text-gray-800 font-bold text-lg">
+                🔗 Googleでログイン
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
 
         <View className="h-20" />
       </ScrollView>

@@ -46,7 +46,8 @@
           "androidAppId": "ca-app-pub-1534462500406736~6107205706",
           "userTrackingPermission": "This identifier will be used to deliver personalized ads to you."
         }
-      ]
+      ],
+      "@react-native-google-signin/google-signin"
     ],
     "experiments": {
       "typedRoutes": true,
