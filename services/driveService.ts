@@ -5,23 +5,91 @@ import {
   isSuccessResponse,
   statusCodes,
 } from "@react-native-google-signin/google-signin";
+// expo-file-system v54+ throws at runtime for deprecated methods when imported from "expo-file-system".
+// This file still uses the classic async API (getInfoAsync/readAsStringAsync/uploadAsync/etc),
+// so we import the legacy entrypoint to keep runtime stable.
 import * as FileSystem from "expo-file-system/legacy";
+import { initDatabase, resetDatabaseConnection } from "./storageService";
 
 const DRIVE_BACKUP_KEY = "@diary_drive_backup";
 const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.appdata";
 const DB_FILENAME = "diary.db";
 
-// Configure Google Sign-In with Drive scope
+let isGoogleSignInConfigured = false;
+
+const ensureGoogleSignInConfigured = (): void => {
+  if (isGoogleSignInConfigured) return;
+
+  // IMPORTANT:
+  // - offlineAccess=true requires a server/web client ID and will throw on Settings load.
+  // - We keep the initial Sign-In minimal (email/profile).
+  //   Drive scope is requested later via `addScopes`, so we can separate "login" from "Drive permission".
+  GoogleSignin.configure({});
+  isGoogleSignInConfigured = true;
+};
+
+const ensureDriveScopeGranted = async (): Promise<
+  { ok: true } | { ok: false; error: string }
+> => {
+  try {
+    ensureGoogleSignInConfigured();
+    const currentUser = await GoogleSignin.getCurrentUser();
+    if (currentUser === null) {
+      return { ok: false, error: "ログインが必要です" };
+    }
+
+    await GoogleSignin.addScopes({ scopes: [DRIVE_SCOPE] });
+    return { ok: true };
+  } catch (error) {
+    if (isErrorWithCode(error)) {
+      switch (error.code) {
+        case statusCodes.SIGN_IN_CANCELLED:
+          return {
+            ok: false,
+            error: "Google Drive の権限付与がキャンセルされました",
+          };
+        case statusCodes.IN_PROGRESS:
+          return { ok: false, error: "権限付与の処理中です" };
+        case statusCodes.PLAY_SERVICES_NOT_AVAILABLE:
+          return { ok: false, error: "Google Play サービスが利用できません" };
+        default:
+          break;
+      }
+
+      if (
+        error.code === "DEVELOPER_ERROR" ||
+        (typeof error.message === "string" &&
+          error.message.includes("DEVELOPER_ERROR"))
+      ) {
+        return {
+          ok: false,
+          error:
+            "Google Drive の権限付与に失敗しました（DEVELOPER_ERROR）。\n" +
+            "- Google Cloud Console の OAuth 同意画面（テストユーザー含む）が設定済みか確認\n" +
+            "- Google Drive API が有効化されているか確認\n" +
+            "- OAuth クライアント（Android）のパッケージ名/SHA-1 がこのアプリの署名鍵と一致しているか再確認\n" +
+            "  - ローカルAPK（standalone/debug等）: androidで .\\gradlew.bat signingReport のSHA-1\n" +
+            "  - Play配布（内部テスト/クローズド等）: Play Console『アプリの署名（App signing key）』のSHA-1（Playが再署名します）\n" +
+            "  - 必要に応じて SHA-1 ごとに Android OAuth クライアントを複数作成してOK\n" +
+            "- 反映後、アプリを再インストールして再試行してください。",
+        };
+      }
+
+      return { ok: false, error: `権限付与エラー: ${error.message}` };
+    }
+    return { ok: false, error: "権限付与で不明なエラーが発生しました" };
+  }
+};
+
+// Configure Google Sign-In (no-op wrapper)
 export const configureGoogleSignIn = () => {
-  GoogleSignin.configure({
-    scopes: [DRIVE_SCOPE],
-    offlineAccess: true,
-  });
+  ensureGoogleSignInConfigured();
 };
 
 // Check if user is signed in
 export const isSignedIn = async (): Promise<boolean> => {
   try {
+    ensureGoogleSignInConfigured();
     const currentUser = await GoogleSignin.getCurrentUser();
     return currentUser !== null;
   } catch {
@@ -36,10 +104,17 @@ export const signInWithGoogle = async (): Promise<{
   error?: string;
 }> => {
   try {
+    ensureGoogleSignInConfigured();
     await GoogleSignin.hasPlayServices();
     const response = await GoogleSignin.signIn();
 
     if (isSuccessResponse(response)) {
+      // Request Drive scope after login (separates login issues from Drive permission issues)
+      const scopeResult = await ensureDriveScopeGranted();
+      if (!scopeResult.ok) {
+        return { success: false, error: scopeResult.error };
+      }
+
       // Store backup info
       await AsyncStorage.setItem(
         DRIVE_BACKUP_KEY,
@@ -54,6 +129,26 @@ export const signInWithGoogle = async (): Promise<{
     }
   } catch (error) {
     if (isErrorWithCode(error)) {
+      if (
+        error.code === "DEVELOPER_ERROR" ||
+        (typeof error.message === "string" &&
+          error.message.includes("DEVELOPER_ERROR"))
+      ) {
+        return {
+          success: false,
+          error:
+            "GoogleログインのAndroid設定が一致していません（DEVELOPER_ERROR）。\n" +
+            "- Google Cloud Console で OAuth クライアントID（種類: Android）を作成/更新\n" +
+            "  - パッケージ名: com.hidesorganization.diary（android/app/build.gradle の applicationId）\n" +
+            "  - SHA-1: このアプリの署名鍵\n" +
+            "    - ローカルAPK（standalone/debug等）: androidで .\\gradlew.bat signingReport\n" +
+            "    - Play配布（内部テスト/クローズド等）: Play Console『アプリの署名（App signing key）』のSHA-1（Playが再署名します）\n" +
+            "    - 必要に応じて SHA-1 ごとに Android OAuth クライアントを複数作成してOK\n" +
+            "- 反映まで数分かかることがあるので数分待って再試行\n" +
+            "- 端末側で Google Play開発者サービス のキャッシュ/データ削除 → 再試行\n" +
+            "- 反映後、APKを再ビルド/再インストールしてください。",
+        };
+      }
       switch (error.code) {
         case statusCodes.SIGN_IN_CANCELLED:
           return { success: false, error: "ログインがキャンセルされました" };
@@ -75,6 +170,7 @@ export const signInWithGoogle = async (): Promise<{
 // Sign out from Google
 export const signOutFromGoogle = async (): Promise<void> => {
   try {
+    ensureGoogleSignInConfigured();
     await GoogleSignin.signOut();
     await AsyncStorage.removeItem(DRIVE_BACKUP_KEY);
   } catch (error) {
@@ -88,6 +184,7 @@ export const getCurrentUser = async (): Promise<{
   lastBackup?: string;
 } | null> => {
   try {
+    ensureGoogleSignInConfigured();
     const stored = await AsyncStorage.getItem(DRIVE_BACKUP_KEY);
     if (stored) {
       return JSON.parse(stored);
@@ -101,12 +198,73 @@ export const getCurrentUser = async (): Promise<{
 // Get access token for Drive API
 const getAccessToken = async (): Promise<string | null> => {
   try {
+    ensureGoogleSignInConfigured();
+    const scopeResult = await ensureDriveScopeGranted();
+    if (!scopeResult.ok) {
+      console.warn(scopeResult.error);
+      return null;
+    }
+
     const tokens = await GoogleSignin.getTokens();
     return tokens.accessToken;
   } catch (error) {
     console.error("Failed to get access token:", error);
     return null;
   }
+};
+
+const safeReadResponseText = async (response: Response): Promise<string> => {
+  try {
+    const contentType = response.headers.get("content-type") || "";
+    if (contentType.includes("application/json")) {
+      const json = await response.json();
+      return JSON.stringify(json);
+    }
+    return await response.text();
+  } catch {
+    return "";
+  }
+};
+
+const startResumableUploadSession = async (params: {
+  accessToken: string;
+  fileId?: string;
+}): Promise<string> => {
+  const { accessToken, fileId } = params;
+
+  const url = fileId
+    ? `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=resumable`
+    : "https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable";
+
+  const method = fileId ? "PATCH" : "POST";
+  const metadata = fileId
+    ? { name: DB_FILENAME }
+    : { name: DB_FILENAME, parents: ["appDataFolder"] };
+
+  const response = await fetch(url, {
+    method,
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json; charset=UTF-8",
+      "X-Upload-Content-Type": "application/octet-stream",
+    },
+    body: JSON.stringify(metadata),
+  });
+
+  if (!response.ok) {
+    const detail = await safeReadResponseText(response);
+    throw new Error(
+      `Driveアップロード初期化に失敗しました (${response.status}). ${detail}`
+    );
+  }
+
+  const uploadUrl = response.headers.get("Location");
+  if (!uploadUrl) {
+    const detail = await safeReadResponseText(response);
+    throw new Error(`DriveアップロードURLが取得できませんでした. ${detail}`);
+  }
+
+  return uploadUrl;
 };
 
 // Backup database to Google Drive
@@ -129,20 +287,28 @@ export const backupToGoogleDrive = async (): Promise<{
       return { success: false, error: "バックアップするデータがありません" };
     }
 
-    // Read the database file as base64
-    const dbContent = await FileSystem.readAsStringAsync(dbPath, {
-      encoding: FileSystem.EncodingType.Base64,
-    });
-
     // Check if backup already exists
     const existingFileId = await findExistingBackup(accessToken);
 
-    if (existingFileId) {
-      // Update existing file
-      await updateDriveFile(accessToken, existingFileId, dbContent);
-    } else {
-      // Create new file
-      await createDriveFile(accessToken, dbContent);
+    // Use resumable upload and stream from file path to avoid base64 memory issues.
+    const uploadUrl = await startResumableUploadSession({
+      accessToken,
+      fileId: existingFileId ?? undefined,
+    });
+    const uploadResult = await FileSystem.uploadAsync(uploadUrl, dbPath, {
+      httpMethod: "PUT",
+      uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
+      headers: {
+        "Content-Type": "application/octet-stream",
+      },
+    });
+
+    if (uploadResult.status !== 200 && uploadResult.status !== 201) {
+      throw new Error(
+        `Driveアップロードに失敗しました (${uploadResult.status}). ${
+          uploadResult.body || ""
+        }`
+      );
     }
 
     // Update last backup time
@@ -156,7 +322,8 @@ export const backupToGoogleDrive = async (): Promise<{
     return { success: true };
   } catch (error) {
     console.error("Backup error:", error);
-    return { success: false, error: "バックアップに失敗しました" };
+    const message = error instanceof Error ? error.message : String(error);
+    return { success: false, error: `バックアップに失敗しました: ${message}` };
   }
 };
 
@@ -215,6 +382,10 @@ export const restoreFromGoogleDrive = async (): Promise<{
             encoding: FileSystem.EncodingType.Base64,
           });
 
+          // Ensure the app uses the restored DB file (re-open SQLite connection)
+          resetDatabaseConnection();
+          await initDatabase();
+
           resolve({ success: true });
         } catch (error) {
           console.error("Restore write error:", error);
@@ -226,6 +397,57 @@ export const restoreFromGoogleDrive = async (): Promise<{
   } catch (error) {
     console.error("Restore error:", error);
     return { success: false, error: "復元に失敗しました" };
+  }
+};
+
+export const deleteBackupFromGoogleDrive = async (): Promise<{
+  success: boolean;
+  error?: string;
+}> => {
+  try {
+    const accessToken = await getAccessToken();
+    if (!accessToken) {
+      return { success: false, error: "ログインが必要です" };
+    }
+
+    const fileId = await findExistingBackup(accessToken);
+    if (!fileId) {
+      return { success: false, error: "削除するバックアップが見つかりません" };
+    }
+
+    const response = await fetch(
+      `https://www.googleapis.com/drive/v3/files/${fileId}`,
+      {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      }
+    );
+
+    if (!response.ok && response.status !== 404) {
+      const detail = await safeReadResponseText(response);
+      return {
+        success: false,
+        error: `バックアップ削除に失敗しました (${response.status}). ${detail}`,
+      };
+    }
+
+    const stored = await AsyncStorage.getItem(DRIVE_BACKUP_KEY);
+    if (stored) {
+      const data = JSON.parse(stored);
+      delete data.lastBackup;
+      await AsyncStorage.setItem(DRIVE_BACKUP_KEY, JSON.stringify(data));
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error("Delete backup error:", error);
+    const message = error instanceof Error ? error.message : String(error);
+    return {
+      success: false,
+      error: `バックアップ削除に失敗しました: ${message}`,
+    };
   }
 };
 
@@ -255,57 +477,4 @@ const findExistingBackup = async (
   }
 };
 
-// Helper: Create new file in Drive
-const createDriveFile = async (
-  accessToken: string,
-  base64Content: string
-): Promise<void> => {
-  const metadata = {
-    name: DB_FILENAME,
-    parents: ["appDataFolder"],
-  };
-
-  const boundary = "diary_backup_boundary";
-  const body = `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(
-    metadata
-  )}\r\n--${boundary}\r\nContent-Type: application/octet-stream\r\nContent-Transfer-Encoding: base64\r\n\r\n${base64Content}\r\n--${boundary}--`;
-
-  await fetch(
-    "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart",
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": `multipart/related; boundary=${boundary}`,
-      },
-      body,
-    }
-  );
-};
-
-// Helper: Update existing file in Drive
-const updateDriveFile = async (
-  accessToken: string,
-  fileId: string,
-  base64Content: string
-): Promise<void> => {
-  // Convert base64 to blob
-  const byteCharacters = atob(base64Content);
-  const byteNumbers = new Array(byteCharacters.length);
-  for (let i = 0; i < byteCharacters.length; i++) {
-    byteNumbers[i] = byteCharacters.charCodeAt(i);
-  }
-  const byteArray = new Uint8Array(byteNumbers);
-
-  await fetch(
-    `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`,
-    {
-      method: "PATCH",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/octet-stream",
-      },
-      body: byteArray,
-    }
-  );
-};
+// NOTE: Upload is handled via resumable upload + FileSystem.uploadAsync above.

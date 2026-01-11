@@ -6,6 +6,7 @@ import {
   searchDiaryEntries,
   updateDiaryEntry,
 } from "@/services/storageService";
+import { useIsFocused } from "@react-navigation/native";
 import { useFocusEffect } from "expo-router";
 import React, { useCallback, useState } from "react";
 import {
@@ -24,6 +25,7 @@ import { Calendar, DateData } from "react-native-calendars";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function HistoryScreen() {
+  const isFocused = useIsFocused();
   const [entries, setEntries] = useState<DiaryEntry[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedEntry, setSelectedEntry] = useState<DiaryEntry | null>(null);
@@ -55,6 +57,10 @@ export default function HistoryScreen() {
   useFocusEffect(
     useCallback(() => {
       loadEntries();
+      return () => {
+        setSelectedEntry(null);
+        setIsEditing(false);
+      };
     }, [loadEntries])
   );
 
@@ -91,7 +97,7 @@ export default function HistoryScreen() {
             setSelectedEntry(null);
             await loadEntries();
             Alert.alert("完了", "日記を削除しました");
-          } catch (e) {
+          } catch {
             Alert.alert("エラー", "削除に失敗しました");
           }
         },
@@ -119,7 +125,7 @@ export default function HistoryScreen() {
       });
       await loadEntries();
       Alert.alert("完了", "日記を更新しました");
-    } catch (e) {
+    } catch {
       Alert.alert("エラー", "更新に失敗しました");
     }
   }, [selectedEntry, editTitle, editContent, loadEntries]);
@@ -254,7 +260,7 @@ export default function HistoryScreen() {
         />
       )}
 
-      <BannerAd />
+      {isFocused && <BannerAd />}
 
       {/* Detail/Edit Modal */}
       <Modal

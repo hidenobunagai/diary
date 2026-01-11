@@ -8,18 +8,20 @@ export interface DiaryEntry {
 }
 
 let db: SQLite.SQLiteDatabase | null = null;
+let dbPromise: Promise<SQLite.SQLiteDatabase> | null = null;
+let initPromise: Promise<void> | null = null;
 
-const getDatabase = async (): Promise<SQLite.SQLiteDatabase> => {
-  if (!db) {
-    db = await SQLite.openDatabaseAsync("diary.db");
-  }
-  return db;
+export const resetDatabaseConnection = (): void => {
+  db = null;
+  dbPromise = null;
+  initPromise = null;
 };
 
-export const initDatabase = async (): Promise<void> => {
-  try {
-    const database = await getDatabase();
-    await database.execAsync(`
+const ensureInitialized = async (
+  database: SQLite.SQLiteDatabase
+): Promise<void> => {
+  if (!initPromise) {
+    initPromise = database.execAsync(`
       CREATE TABLE IF NOT EXISTS diary_entries (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         title TEXT NOT NULL,
@@ -27,6 +29,28 @@ export const initDatabase = async (): Promise<void> => {
         created_at TEXT DEFAULT CURRENT_TIMESTAMP
       );
     `);
+  }
+  await initPromise;
+};
+
+const getDatabase = async (): Promise<SQLite.SQLiteDatabase> => {
+  if (db) {
+    await ensureInitialized(db);
+    return db;
+  }
+
+  if (!dbPromise) {
+    dbPromise = SQLite.openDatabaseAsync("diary.db");
+  }
+
+  db = await dbPromise;
+  await ensureInitialized(db);
+  return db;
+};
+
+export const initDatabase = async (): Promise<void> => {
+  try {
+    await getDatabase();
     console.log("[SQLite] Database initialized");
   } catch (e) {
     console.error("[SQLite] Failed to initialize database", e);

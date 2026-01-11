@@ -6,6 +6,7 @@ import {
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import "react-native-reanimated";
+import { enableScreens } from "react-native-screens";
 import "../global.css";
 
 import { useColorScheme } from "@/hooks/use-color-scheme";
@@ -15,6 +16,9 @@ import { useEffect } from "react";
 export const unstable_settings = {
   anchor: "(tabs)",
 };
+
+// Stability-first: avoid native screen detachment/reattachment issues on some devices.
+enableScreens(false);
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();

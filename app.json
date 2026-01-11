@@ -18,7 +18,8 @@
       },
       "edgeToEdgeEnabled": false,
       "predictiveBackGestureEnabled": false,
-      "package": "com.hidesorganization.diary"
+      "package": "com.hidesorganization.diary",
+      "versionCode": 1
     },
     "web": {
       "output": "static",
@@ -45,7 +46,18 @@
           "userTrackingPermission": "This identifier will be used to deliver personalized ads to you."
         }
       ],
-      "@react-native-google-signin/google-signin"
+      "@react-native-google-signin/google-signin",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "ndkVersion": "27.1.12297006",
+            "compileSdkVersion": 35,
+            "targetSdkVersion": 35,
+            "buildToolsVersion": "35.0.0"
+          }
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
@@ -58,5 +70,8 @@
       }
     },
     "owner": "hides-organization"
+  },
+  "react-native-google-mobile-ads": {
+    "android_app_id": "ca-app-pub-1534462500406736~6107205706"
   }
 }

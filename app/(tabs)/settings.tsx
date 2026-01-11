@@ -1,6 +1,7 @@
 import {
   backupToGoogleDrive,
   configureGoogleSignIn,
+  deleteBackupFromGoogleDrive,
   getCurrentUser,
   isSignedIn,
   restoreFromGoogleDrive,
@@ -13,7 +14,7 @@ import {
   saveSettings,
 } from "@/services/settingsService";
 import { useFocusEffect } from "expo-router";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -56,6 +57,7 @@ export default function SettingsScreen() {
   const [isSaving, setIsSaving] = useState(false);
 
   // Google Drive state
+  const [driveEnabled, setDriveEnabled] = useState(false);
   const [driveSignedIn, setDriveSignedIn] = useState(false);
   const [driveEmail, setDriveEmail] = useState<string | null>(null);
   const [lastBackup, setLastBackup] = useState<string | null>(null);
@@ -68,35 +70,56 @@ export default function SettingsScreen() {
   }, []);
 
   const loadDriveStatus = useCallback(async () => {
-    const signedIn = await isSignedIn();
-    setDriveSignedIn(signedIn);
+    try {
+      const signedIn = await isSignedIn();
+      setDriveSignedIn(signedIn);
 
-    if (signedIn) {
-      const user = await getCurrentUser();
-      if (user) {
-        setDriveEmail(user.email);
-        setLastBackup(user.lastBackup || null);
+      if (signedIn) {
+        const user = await getCurrentUser();
+        if (user) {
+          setDriveEmail(user.email);
+          setLastBackup(user.lastBackup || null);
+        }
+      } else {
+        setDriveEmail(null);
+        setLastBackup(null);
       }
+    } catch {
+      setDriveSignedIn(false);
+      setDriveEmail(null);
+      setLastBackup(null);
     }
-  }, []);
-
-  useEffect(() => {
-    configureGoogleSignIn();
   }, []);
 
   useFocusEffect(
     useCallback(() => {
       loadSettings();
-      loadDriveStatus();
-    }, [loadSettings, loadDriveStatus])
+      if (driveEnabled) {
+        loadDriveStatus();
+      }
+    }, [loadSettings, loadDriveStatus, driveEnabled])
   );
+
+  const enableDrive = async () => {
+    try {
+      configureGoogleSignIn();
+      setDriveEnabled(true);
+      await loadDriveStatus();
+    } catch {
+      Alert.alert(
+        "エラー",
+        "Google Drive機能の初期化に失敗しました。しばらくしてから再度お試しください。"
+      );
+      setDriveEnabled(false);
+    }
+  };
 
   const handleSave = async () => {
     setIsSaving(true);
     try {
       await saveSettings(settings);
       Alert.alert("保存完了", "設定を保存しました");
-    } catch (e) {
+    } catch {
       Alert.alert("エラー", "設定の保存に失敗しました");
     } finally {
       setIsSaving(false);
@@ -108,6 +131,9 @@ export default function SettingsScreen() {
   };
 
   const handleGoogleSignIn = async () => {
+    if (!driveEnabled) {
+      await enableDrive();
+    }
     const result = await signInWithGoogle();
     if (result.success) {
       setDriveSignedIn(true);
@@ -165,13 +191,42 @@ export default function SettingsScreen() {
               if (result.success) {
                 Alert.alert(
                   "復元完了",
-                  "バックアップから復元しました。アプリを再起動してください。"
+                  "バックアップから復元しました。画面に反映されない場合はアプリを再起動してください。"
                 );
               } else {
                 Alert.alert("エラー", result.error || "復元に失敗しました");
               }
             } finally {
               setIsRestoring(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleDeleteBackup = async () => {
+    Alert.alert(
+      "削除確認",
+      "Google Drive上のバックアップを削除しますか？\n※この操作は取り消せません",
+      [
+        { text: "キャンセル", style: "cancel" },
+        {
+          text: "削除",
+          style: "destructive",
+          onPress: async () => {
+            const result = await deleteBackupFromGoogleDrive();
+            if (result.success) {
+              setLastBackup(null);
+              Alert.alert(
+                "削除完了",
+                "Google Drive上のバックアップを削除しました"
+              );
+            } else {
+              Alert.alert(
+                "エラー",
+                result.error || "バックアップ削除に失敗しました"
+              );
             }
           },
         },
@@ -286,7 +341,21 @@ export default function SettingsScreen() {
             日記データをGoogle Driveにバックアップ・復元
           </Text>
 
-          {driveSignedIn ? (
+          {!driveEnabled ? (
+            <View>
+              <Text className="text-gray-500 text-sm mb-3">
+                ※ Google Drive機能は必要なときだけ有効化できます
+              </Text>
+              <TouchableOpacity
+                className="py-4 rounded-xl items-center bg-gray-800 border border-gray-700"
+                onPress={enableDrive}
+              >
+                <Text className="text-white font-bold text-lg">
+                  ☁️ Google Driveを有効化
+                </Text>
+              </TouchableOpacity>
+            </View>
+          ) : driveSignedIn ? (
             <View>
               <View className="bg-gray-800 p-4 rounded-lg mb-4">
                 <Text className="text-gray-400 text-sm">ログイン中:</Text>
@@ -329,6 +398,19 @@ export default function SettingsScreen() {
                   )}
                 </TouchableOpacity>
               </View>
+
+              <TouchableOpacity
+                className="py-3 rounded-xl items-center bg-gray-800 border border-gray-700 mb-2"
+                onPress={handleDeleteBackup}
+                disabled={isBackingUp || isRestoring}
+              >
+                <Text className="text-white font-bold">
+                  🗑️ バックアップ削除
+                </Text>
+                <Text className="text-gray-400 text-xs mt-1">
+                  ※ Driveの「アプリデータ」領域から削除されます
+                </Text>
+              </TouchableOpacity>
 
               <TouchableOpacity
                 className="py-2 items-center"

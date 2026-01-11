@@ -9,6 +9,7 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { generateDiaryEntry } from "../services/geminiService";
+import { saveDiaryEntry } from "../services/storageService";
 
 export default function VoiceRecorder() {
   const [recording, setRecording] = useState<Audio.Recording | undefined>(
@@ -42,7 +43,13 @@ export default function VoiceRecorder() {
   async function startRecording() {
     try {
       const permission = await Audio.requestPermissionsAsync();
-      if (permission.status !== "granted") return;
+      if (permission.status !== "granted") {
+        Alert.alert(
+          "マイク権限が必要です",
+          "録音するにはマイクへのアクセスを許可してください。"
+        );
+        return;
+      }
 
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: true,
@@ -71,17 +78,21 @@ export default function VoiceRecorder() {
 
     setIsProcessing(true);
     try {
-      const jsonString = await generateDiaryEntry(uri);
-      const entryData = JSON.parse(jsonString);
-
-      const { saveDiaryEntry } = require("../services/storageService");
+      const entryData = await generateDiaryEntry(uri);
       await saveDiaryEntry(entryData.title, entryData.content);
 
       setDiaryEntry({ title: entryData.title, content: entryData.content });
       Alert.alert("保存完了", "日記を保存しました。");
     } catch (e) {
       console.error(e);
-      Alert.alert("エラー", "日記の処理または保存に失敗しました。");
+      const message =
+        e instanceof Error && e.message
+          ? e.message
+          : "日記の処理または保存に失敗しました。";
+      Alert.alert(
+        "エラー",
+        __DEV__ ? `${message}\n\n(詳細はコンソールを確認してください)` : message
+      );
     } finally {
       setIsProcessing(false);
     }
@@ -97,6 +108,7 @@ export default function VoiceRecorder() {
       <Animated.View style={animatedStyle}>
         <TouchableOpacity
           onPress={recording ? stopRecording : startRecording}
+          disabled={isProcessing}
           className="w-36 h-36 rounded-full justify-center items-center"
           style={{
             backgroundColor: recording ? "#ef4444" : "#3b82f6",
