@@ -1,42 +1,27 @@
 ---
-title: Account Deletion / Data Deletion
-toc: true
+title: Data Deletion
 permalink: /account-deletion.html
 ---
 
-# アカウント削除 / データ削除
+# データ削除の方法
 
-dIAry は、開発者のサーバー上に「アプリ固有のアカウント」を作成しません。
-（Google Drive バックアップ/復元を利用する場合のみ、Google アカウントで認証します）
+※ dIAry は、開発者のサーバー上にアプリ固有のアカウントを作成しません。
+そのため「開発者にアカウント削除を依頼する」形式の削除手続きはありません。
 
-以下は、ユーザーがデータ削除を行う方法です。
+データ削除の手順は、こちらにまとめています：
 
-## 1) 端末内データ（ローカル）を削除する
+- https://hidenobunagai.github.io/diary/data-deletion.html
 
-- アプリをアンインストールすると、端末内に保存されている日記データ（SQLite）や設定情報が削除されます。
+---
 
-## 2) Google Drive のバックアップデータを削除する（利用している場合）
+# Data Deletion
 
-バックアップはユーザーの Google Drive（アプリデータ領域: AppDataFolder）に保存されます。
+dIAry does not create an app-specific account on the developer’s servers.
+There is no developer-handled “account deletion request” process.
 
-- Google Drive（Web）を開く
-- 右上の歯車 → **設定** → **アプリの管理（Manage Apps）**
-- 一覧から dIAry を探し、**非表示のアプリデータを削除（Delete hidden app data）** を実行
+See the data deletion instructions here:
 
-または、Google アカウントの「サードパーティ アクセス」から dIAry のアクセス権を削除できます。
-
-## 3) Google アカウント連携（認可）を解除する
-
-- Google アカウントの権限ページ（サードパーティ アクセス）で、dIAry のアクセスを削除してください。
-
-## 4) 広告（AdMob）について
-
-dIAry は Google Mobile Ads SDK（AdMob）を利用する場合があります。
-広告配信に関するデータの取り扱いは Google のポリシーが適用されます。
-
-- [Google プライバシーポリシー](https://policies.google.com/privacy)
-
-## お問い合わせ
+- https://hidenobunagai.github.io/diary/data-deletion.html
 
 削除に関するご質問は GitHub Issues へお願いします。
 
