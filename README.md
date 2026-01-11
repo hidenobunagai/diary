@@ -13,6 +13,7 @@
 
 - GitHub Pages: https://hidenobunagai.github.io/diary/
 - Privacy Policy: https://hidenobunagai.github.io/diary/PRIVACY_POLICY.html
+- Account/Data Deletion: https://hidenobunagai.github.io/diary/account-deletion.html
 - Issues: https://github.com/hidenobunagai/diary/issues
 
 ## Development
