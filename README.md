@@ -1,50 +1,34 @@
-# Welcome to your Expo app 👋
+# dIAry
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+音声日記アプリです。
 
-## Get started
+- 音声録音 → Google Gemini API で文字起こし/要約
+- 日記データは端末内（SQLite）に保存
+- 任意で Google Drive（AppDataFolder）へバックアップ/復元
+- 広告表示（AdMob）
 
-1. Install dependencies
+このリポジトリは Expo の仕組み（Expo Router など）を使いつつ、Play Store 提出用の AAB は **EAS などのクラウドビルド無し**で **Windows のローカル Gradle**から生成できる形にしています。
 
-   ```bash
-   npm install
-   ```
+## Links
 
-2. Start the app
+- GitHub Pages: https://hidenobunagai.github.io/diary/
+- Privacy Policy: https://hidenobunagai.github.io/diary/PRIVACY_POLICY.html
+- Issues: https://github.com/hidenobunagai/diary/issues
 
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+## Development
 
 ```bash
-npm run reset-project
+npm install
+npx expo start
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+## Android (Windows local Gradle)
 
-## Learn more
+詳細は ANDROID_LOCAL_BUILD.md を参照してください。
 
-To learn more about developing your project with Expo, look at the following resources:
+- standalone APK（Metro 不要）: `:app:assembleStandalone`
+- Play 提出用 AAB（署名必須）: `:app:bundleRelease`
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+## Notes (Google Sign-In / Drive)
 
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+Play 配布は Play App Signing により再署名されるため、Google ログイン/Drive を使う場合は **Play Console の App signing key の SHA-1** を Google Cloud Console の OAuth（Android）に登録してください。
