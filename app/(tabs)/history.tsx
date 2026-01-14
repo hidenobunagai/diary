@@ -4,11 +4,12 @@ import {
   deleteDiaryEntry,
   getDiaryEntries,
   searchDiaryEntries,
+  subscribeDatabaseChanges,
   updateDiaryEntry,
 } from "@/services/storageService";
 import { useIsFocused } from "@react-navigation/native";
 import { useFocusEffect } from "expo-router";
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useMemo, useRef, useState } from "react";
 import {
   Alert,
   FlatList,
@@ -24,6 +25,45 @@ import {
 import { Calendar, DateData } from "react-native-calendars";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+const toDateKey = (createdAt: string | undefined): string | null => {
+  if (!createdAt) return null;
+
+  // Common SQLite format: "YYYY-MM-DD HH:MM:SS"
+  // Common ISO-ish format: "YYYY-MM-DDTHH:MM:SS(.sss)Z"
+  // If it's already starting with YYYY-MM-DD, take that part reliably.
+  const m = createdAt.match(/^(\d{4}-\d{2}-\d{2})/);
+  if (m && m[1]) return m[1];
+
+  // Fallback: try Date parsing (may fail depending on engine/format)
+  const d = new Date(createdAt);
+  if (Number.isNaN(d.getTime())) return null;
+
+  const y = d.getFullYear();
+  const mo = String(d.getMonth() + 1).padStart(2, "0");
+  const da = String(d.getDate()).padStart(2, "0");
+  return `${y}-${mo}-${da}`;
+};
+
+const formatDateSafe = (createdAt: string | undefined): string => {
+  if (!createdAt) return "";
+
+  const d = new Date(createdAt);
+
+  // If the runtime can't parse (e.g., "YYYY-MM-DD HH:MM:SS" on some engines),
+  // fall back to showing the date key.
+  if (Number.isNaN(d.getTime())) {
+    const key = toDateKey(createdAt);
+    return key ? `${key} (日付のみ)` : createdAt;
+  }
+
+  return d.toLocaleDateString("ja-JP", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    weekday: "short",
+  });
+};
+
 export default function HistoryScreen() {
   const isFocused = useIsFocused();
   const [entries, setEntries] = useState<DiaryEntry[]>([]);
@@ -36,6 +76,9 @@ export default function HistoryScreen() {
   const [editTitle, setEditTitle] = useState("");
   const [editContent, setEditContent] = useState("");
 
+  // Prevent double refresh when focus effect and DB event fire close together.
+  const lastRefreshAtRef = useRef<number>(0);
+
   const loadEntries = useCallback(async () => {
     try {
       const data = await getDiaryEntries();
@@ -43,8 +86,8 @@ export default function HistoryScreen() {
 
       const marks: Record<string, any> = {};
       data.forEach((entry) => {
-        if (entry.created_at) {
-          const dateKey = entry.created_at.split("T")[0].split(" ")[0];
+        const dateKey = toDateKey(entry.created_at);
+        if (dateKey) {
           marks[dateKey] = { marked: true, dotColor: "#3b82f6" };
         }
       });
@@ -57,11 +100,25 @@ export default function HistoryScreen() {
   useFocusEffect(
     useCallback(() => {
       loadEntries();
+
+      // Auto-refresh when DB changes (e.g., after Drive restore).
+      // Only refresh when this screen is focused to avoid unnecessary work.
+      const unsubscribe = subscribeDatabaseChanges(() => {
+        if (!isFocused) return;
+
+        const now = Date.now();
+        if (now - lastRefreshAtRef.current < 500) return;
+        lastRefreshAtRef.current = now;
+
+        loadEntries();
+      });
+
       return () => {
+        unsubscribe();
         setSelectedEntry(null);
         setIsEditing(false);
       };
-    }, [loadEntries])
+    }, [loadEntries, isFocused]),
   );
 
   const onRefresh = useCallback(async () => {
@@ -80,7 +137,7 @@ export default function HistoryScreen() {
         setEntries(results);
       }
     },
-    [loadEntries]
+    [loadEntries],
   );
 
   const handleDelete = useCallback(async () => {
@@ -131,14 +188,7 @@ export default function HistoryScreen() {
   }, [selectedEntry, editTitle, editContent, loadEntries]);
 
   const formatDate = (dateStr: string | undefined) => {
-    if (!dateStr) return "";
-    const date = new Date(dateStr);
-    return date.toLocaleDateString("ja-JP", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-      weekday: "short",
-    });
+    return formatDateSafe(dateStr);
   };
 
   const onDayPress = (day: DateData) => {
@@ -146,13 +196,14 @@ export default function HistoryScreen() {
     setSearchQuery("");
   };
 
-  const filteredEntries = selectedDate
-    ? entries.filter((entry) => {
-        if (!entry.created_at) return false;
-        const entryDate = entry.created_at.split("T")[0].split(" ")[0];
-        return entryDate === selectedDate;
-      })
-    : entries;
+  const filteredEntries = useMemo(() => {
+    if (!selectedDate) return entries;
+
+    return entries.filter((entry) => {
+      const entryDate = toDateKey(entry.created_at);
+      return entryDate === selectedDate;
+    });
+  }, [entries, selectedDate]);
 
   const renderItem = ({ item }: { item: DiaryEntry }) => (
     <TouchableOpacity
@@ -240,8 +291,8 @@ export default function HistoryScreen() {
             {searchQuery
               ? "検索結果がありません"
               : selectedDate
-              ? "この日の日記はありません"
-              : "まだ日記がありません"}
+                ? "この日の日記はありません"
+                : "まだ日記がありません"}
           </Text>
         </View>
       ) : (

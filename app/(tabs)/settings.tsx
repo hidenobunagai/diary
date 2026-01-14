@@ -10,10 +10,11 @@ import {
 } from "@/services/driveService";
 import {
   DiarySettings,
+  getGeminiApiKey,
   getSettings,
   saveSettings,
 } from "@/services/settingsService";
-import { useFocusEffect } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import React, { useCallback, useState } from "react";
 import {
   ActivityIndicator,
@@ -66,7 +67,8 @@ export default function SettingsScreen() {
 
   const loadSettings = useCallback(async () => {
     const loaded = await getSettings();
-    setSettings(loaded);
+    const apiKey = await getGeminiApiKey();
+    setSettings({ ...loaded, geminiApiKey: apiKey });
   }, []);
 
   const loadDriveStatus = useCallback(async () => {
@@ -97,7 +99,7 @@ export default function SettingsScreen() {
       if (driveEnabled) {
         loadDriveStatus();
       }
-    }, [loadSettings, loadDriveStatus, driveEnabled])
+    }, [loadSettings, loadDriveStatus, driveEnabled]),
   );
 
   const enableDrive = async () => {
@@ -108,7 +110,7 @@ export default function SettingsScreen() {
     } catch {
       Alert.alert(
         "エラー",
-        "Google Drive機能の初期化に失敗しました。しばらくしてから再度お試しください。"
+        "Google Drive機能の初期化に失敗しました。しばらくしてから再度お試しください。",
       );
       setDriveEnabled(false);
     }
@@ -117,6 +119,7 @@ export default function SettingsScreen() {
   const handleSave = async () => {
     setIsSaving(true);
     try {
+      // Save to storage (API key is stored securely; other settings are stored normally)
       await saveSettings(settings);
       Alert.alert("保存完了", "設定を保存しました");
     } catch {
@@ -191,7 +194,15 @@ export default function SettingsScreen() {
               if (result.success) {
                 Alert.alert(
                   "復元完了",
-                  "バックアップから復元しました。画面に反映されない場合はアプリを再起動してください。"
+                  "バックアップから復元しました。履歴に移動します。",
+                  [
+                    {
+                      text: "OK",
+                      onPress: () => {
+                        router.navigate("/(tabs)/history");
+                      },
+                    },
+                  ],
                 );
               } else {
                 Alert.alert("エラー", result.error || "復元に失敗しました");
@@ -201,7 +212,7 @@ export default function SettingsScreen() {
             }
           },
         },
-      ]
+      ],
     );
   };
 
@@ -220,17 +231,17 @@ export default function SettingsScreen() {
               setLastBackup(null);
               Alert.alert(
                 "削除完了",
-                "Google Drive上のバックアップを削除しました"
+                "Google Drive上のバックアップを削除しました",
               );
             } else {
               Alert.alert(
                 "エラー",
-                result.error || "バックアップ削除に失敗しました"
+                result.error || "バックアップ削除に失敗しました",
               );
             }
           },
         },
-      ]
+      ],
     );
   };
 

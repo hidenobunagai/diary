@@ -16,14 +16,14 @@ export default function TabLayout() {
         headerShown: false,
         tabBarButton: HapticTab,
         lazy: true,
-        detachInactiveScreens: false,
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
           title: "Record",
-          unmountOnBlur: true,
+          // NOTE: expo-router Tabs options typings may not include `unmountOnBlur`.
+          // If you need cleanup-on-leave, prefer doing it in screen-level focus effects.
           tabBarIcon: ({ color }) => (
             <IconSymbol size={28} name="house.fill" color={color} />
           ),
@@ -33,7 +33,8 @@ export default function TabLayout() {
         name="history"
         options={{
           title: "History",
-          unmountOnBlur: true,
+          // NOTE: expo-router Tabs options typings may not include `unmountOnBlur`.
+          // If you need cleanup-on-leave, prefer doing it in screen-level focus effects.
           tabBarIcon: ({ color }) => (
             <IconSymbol size={28} name="paperplane.fill" color={color} />
           ),
@@ -43,7 +44,8 @@ export default function TabLayout() {
         name="settings"
         options={{
           title: "Settings",
-          unmountOnBlur: true,
+          // NOTE: expo-router Tabs options typings may not include `unmountOnBlur`.
+          // If you need cleanup-on-leave, prefer doing it in screen-level focus effects.
           tabBarIcon: ({ color }) => (
             <IconSymbol size={28} name="gearshape.fill" color={color} />
           ),

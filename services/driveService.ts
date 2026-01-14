@@ -121,7 +121,7 @@ export const signInWithGoogle = async (): Promise<{
         JSON.stringify({
           email: response.data.user.email,
           signedInAt: new Date().toISOString(),
-        })
+        }),
       );
       return { success: true, email: response.data.user.email };
     } else {
@@ -254,7 +254,7 @@ const startResumableUploadSession = async (params: {
   if (!response.ok) {
     const detail = await safeReadResponseText(response);
     throw new Error(
-      `Driveアップロード初期化に失敗しました (${response.status}). ${detail}`
+      `Driveアップロード初期化に失敗しました (${response.status}). ${detail}`,
     );
   }
 
@@ -307,7 +307,7 @@ export const backupToGoogleDrive = async (): Promise<{
       throw new Error(
         `Driveアップロードに失敗しました (${uploadResult.status}). ${
           uploadResult.body || ""
-        }`
+        }`,
       );
     }
 
@@ -344,59 +344,41 @@ export const restoreFromGoogleDrive = async (): Promise<{
       return { success: false, error: "バックアップが見つかりません" };
     }
 
-    // Download file content
-    const response = await fetch(
-      `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
-      {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      }
-    );
+    // Ensure SQLite directory exists
+    const sqliteDir = `${FileSystem.documentDirectory}SQLite`;
+    const dirInfo = await FileSystem.getInfoAsync(sqliteDir);
+    if (!dirInfo.exists) {
+      await FileSystem.makeDirectoryAsync(sqliteDir, {
+        intermediates: true,
+      });
+    }
 
-    if (!response.ok) {
+    // Download the DB file directly to disk (no FileReader / base64)
+    const dbPath = `${sqliteDir}/${DB_FILENAME}`;
+    const downloadUrl = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`;
+
+    // NOTE:
+    // - expo-file-system's downloadAsync supports headers for authenticated downloads.
+    // - If download fails due to networking/auth issues, we return a user-friendly error.
+    const result = await FileSystem.downloadAsync(downloadUrl, dbPath, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+
+    if (result.status !== 200) {
       return { success: false, error: "ダウンロードに失敗しました" };
     }
 
-    // Get base64 content
-    const blob = await response.blob();
-    const reader = new FileReader();
+    // Ensure the app uses the restored DB file (re-open SQLite connection)
+    resetDatabaseConnection();
+    await initDatabase();
 
-    return new Promise((resolve) => {
-      reader.onloadend = async () => {
-        try {
-          const base64 = (reader.result as string).split(",")[1];
-
-          // Ensure SQLite directory exists
-          const sqliteDir = `${FileSystem.documentDirectory}SQLite`;
-          const dirInfo = await FileSystem.getInfoAsync(sqliteDir);
-          if (!dirInfo.exists) {
-            await FileSystem.makeDirectoryAsync(sqliteDir, {
-              intermediates: true,
-            });
-          }
-
-          // Write database file
-          const dbPath = `${sqliteDir}/${DB_FILENAME}`;
-          await FileSystem.writeAsStringAsync(dbPath, base64, {
-            encoding: FileSystem.EncodingType.Base64,
-          });
-
-          // Ensure the app uses the restored DB file (re-open SQLite connection)
-          resetDatabaseConnection();
-          await initDatabase();
-
-          resolve({ success: true });
-        } catch (error) {
-          console.error("Restore write error:", error);
-          resolve({ success: false, error: "復元に失敗しました" });
-        }
-      };
-      reader.readAsDataURL(blob);
-    });
+    return { success: true };
   } catch (error) {
     console.error("Restore error:", error);
-    return { success: false, error: "復元に失敗しました" };
+    const message = error instanceof Error ? error.message : String(error);
+    return { success: false, error: `復元に失敗しました: ${message}` };
   }
 };
 
@@ -422,7 +404,7 @@ export const deleteBackupFromGoogleDrive = async (): Promise<{
         headers: {
           Authorization: `Bearer ${accessToken}`,
         },
-      }
+      },
     );
 
     if (!response.ok && response.status !== 404) {
@@ -453,7 +435,7 @@ export const deleteBackupFromGoogleDrive = async (): Promise<{
 
 // Helper: Find existing backup file in Drive
 const findExistingBackup = async (
-  accessToken: string
+  accessToken: string,
 ): Promise<string | null> => {
   try {
     const response = await fetch(
@@ -462,7 +444,7 @@ const findExistingBackup = async (
         headers: {
           Authorization: `Bearer ${accessToken}`,
         },
-      }
+      },
     );
 
     if (!response.ok) return null;

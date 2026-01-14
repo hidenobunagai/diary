@@ -13,7 +13,7 @@
 
 ## 簡単な説明（80 文字以内）
 
-音声で残す日記。録音→文字起こし/要約、端末保存、Driveバックアップ対応。
+音声で残す日記。録音 → 文字起こし/要約、端末保存、Drive バックアップ対応。
 
 ---
 
@@ -30,9 +30,10 @@ dIAry は、声で書けるシンプルな音声日記アプリです。
 ・広告表示（AdMob）
 
 【使い方】
-1) 録音して日記を作成
-2) 必要に応じて、設定から Gemini API キーを入力
-3) バックアップが必要なら Google でログインして Drive に保存
+
+1. 録音して日記を作成
+2. 必要に応じて、設定から Gemini API キーを入力
+3. バックアップが必要なら Google でログインして Drive に保存
 
 【プライバシー】
 ・開発者のサーバーに個人情報を収集・保管しません。
@@ -72,7 +73,7 @@ https://hidenobunagai.github.io/diary/PRIVACY_POLICY.html
 
 ---
 
-## おすすめのスクショ構成（そのまま撮ればOK）
+## おすすめのスクショ構成（そのまま撮れば OK）
 
 1. ホーム（今日の入力/導線が分かる画面）
 2. 録音中/録音完了（マイク利用が分かる画面）
@@ -94,9 +95,9 @@ https://hidenobunagai.github.io/diary/PRIVACY_POLICY.html
 
 ### B) ADB で取得（画面が多い場合に便利）
 
-1) Android SDK Platform Tools をインストール
-2) 端末で「開発者向けオプション」→「USB デバッグ」を ON
-3) PowerShell で実行:
+1. Android SDK Platform Tools をインストール
+2. 端末で「開発者向けオプション」→「USB デバッグ」を ON
+3. PowerShell で実行:
 
 ```powershell
 adb devices
